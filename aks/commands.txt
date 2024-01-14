@@ -89,7 +89,7 @@ To scale pods manually
   Execute the follwoing command informing number of instances and the deployment name
    kubectl scale --replicas=3 deployment.apps/shoppingclient-deployment
   
-Autoscale pods in AKS
+Autoscale pods in AKS -----------------------------------------------------------------------------------------------------------------------------------------------------------------
  Get the AKS version. The version must be greater than 1.1
  az aks show --resource-group myResourceGroup --name myAKSCluster --query kubernetesVersion --output table
    Result
@@ -122,4 +122,49 @@ Autoscale pods in AKS
      Warning  FailedScheduling  4m35s  default-scheduler  0/1 nodes are available: 1 Insufficient cpu. preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod..
 
     For this case we need to decrease the values of minReplicas for shoppingapi-hpa and apply the changes
- 
+
+Update adn deploy microservices with zero downtime ------------------------------------------------------------------------------------------------------------------------------------
+ Update the application
+ Remove local images (shoppingclient and dtsshoppingacr.azurecr.io/shoppingclient)
+  docker images
+  docker rmi <image-id> -f
+ Build the images using docker-compose
+  docker-compose -f .\docker-compose.yml -f .\docker-compose.override.yml up -d
+ Tag the latest image created with a new version
+  docker tag shoppingclient:latest dtsshoppingacr.azurecr.io/shoppingclient:v2
+ Push the image to the ACR  
+  docker push dtsshoppingacr.azurecr.io/shoppingclient:v2
+
+  * Use docker login if a message "denied: requested access to the resource is denied" appears  
+    docker login dtsshoppingacr.azurecr.io -u <login> -p <password>
+    <acr-name>: dtsshoppingacr.azurecr.io
+    <login>...: username from ACR > Access keys
+    <password>: password from ACR > Access keys
+ Check the images: az acr repository list --name dtsshoppingacr --output table
+   Result
+   --------------
+   shoppingapi
+   shoppingclient
+
+ Check the tags: az acr repository show-tags --name dtsshoppingacr --repository shoppingclient --output table
+   Result
+   --------
+   v1
+   v2
+ Change the image tag in the shoppingclient.yam file from image: dtsshoppingacr.azurecr.io/shoppingclient:v1 to image: dtsshoppingacr.azurecr.io/shoppingclient:v2
+ Apply the changes: kubectl apply -f .\aks\
+ Check the deployments and the replicat sets
+ kubectl get deployment -o wide
+   NAME                        READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS       IMAGES                                        SELECTOR
+   mongo-deployment            1/1     1            1           42m   mongodb          mongo                                         app=mongodb
+   shoppingapi-deployment      3/3     3            3           42m   shoppingapi      dtsshoppingacr.azurecr.io/shoppingapi:v1      app=shoppingapi
+   shoppingclient-deployment   3/3     3            3           42m   shoppingclient   dtsshoppingacr.azurecr.io/shoppingclient:v2   app=shoppingclient
+
+   PS D:\devel\net\Training\Shopping> kubectl get replicaset -o wide
+   NAME                                   DESIRED   CURRENT   READY   AGE    CONTAINERS       IMAGES                                        SELECTOR
+   mongo-deployment-84b4c699c8            1         1         1       42m    mongodb          mongo                                         app=mongodb,pod-template-hash=84b4c699c8
+   shoppingapi-deployment-5c495ffbb8      3         3         3       42m    shoppingapi      dtsshoppingacr.azurecr.io/shoppingapi:v1      app=shoppingapi,pod-template-hash=5c495ffbb8
+   shoppingclient-deployment-679b854b9    0         0         0       42m    shoppingclient   dtsshoppingacr.azurecr.io/shoppingclient:v1   app=shoppingclient,pod-template-hash=679b854b9
+   shoppingclient-deployment-778bc6f4b4   3         3         3       2m3s   shoppingclient   dtsshoppingacr.azurecr.io/shoppingclient:v2   app=shoppingclient,pod-template-hash=778bc6f4b4
+
+   The images must be v2 - the most recent one

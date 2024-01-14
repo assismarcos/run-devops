@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: shoppingclient
-          image: dtsshoppingacr.azurecr.io/shoppingclient:v1 #image pulled from the Azure Container Registry
+          image: dtsshoppingacr.azurecr.io/shoppingclient:v2 #image pulled from the Azure Container Registry
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
