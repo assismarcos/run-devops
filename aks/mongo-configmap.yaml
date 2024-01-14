@@ -1,0 +1,14 @@
+# must be created first using the command kubectl apply -f mongo-configmap.yaml
+# then use kubectl applu -f shoppingapi.yaml to deploy the shopping api
+
+# to make sure the configuration was created, use: kubectl get cm
+#NAME               DATA   AGE
+#kube-root-ca.crt   1      17h
+#mongo-configmap    1      9s
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongo-configmap
+data:
+  connection-string: mongodb://username:password@mongo-service:27017

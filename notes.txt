@@ -1,0 +1,19 @@
+Deployment
+-> ReplicaSet
+   -> Pods
+      -> Containers
+
+Load balacing
+ -> Services
+
+ ACR - Azure Container Registry
+  - Is a managed, private Docker registry service based on the open-source Docker Registry
+  - Create and maintain Azure container registries to store and manage your private Docker container images and related artifacts.
+
+AKS - Azure Kubernetes Services
+  - Make it simple to deploy and manage Kubernetes clusters on Azure
+  - Reduce the complexity and operation overhead if managing Kubernetes by offloading much of that responsability to Azure
+  - As a managed Kubernetes service, Azure handles critical tasks like health monitoring and maintenance
+  - The Kubernetes masters are managed by Azure. You only manage and maintain the agent nodes
+  - You can create an AKS cluster in the Azure portal, with the Azure CLI, or template driven deployment options such as Resource Manager templates and Terraform
+           

@@ -1,0 +1,125 @@
+az login
+
+Create resource group
+  az group create --name myResourceGroup --location southbrazil
+
+Create container registry
+  az acr create --resource-group myResourceGroup --name dtsshoppingacr --sku Basic
+
+Enable admin in the container registry 
+  az acr update -n dtsshoppingacr --admin-enabled=true
+
+Login to ACR to push images
+  az acr login --name dtsshoppingacr
+
+Get the login server address
+  az acr list --resource-group myResourceGroup --query "[].{acrLoginServer:loginServer}" --output table  
+    AcrLoginServer
+    -------------------------
+    dtsshoppingacr.azurecr.io
+
+  It can be retrieved from the Azure portal: ACR name -> access keys -> login server
+
+Tag the images
+  docker tag shoppingapi:latest dtsshoppingacr.azurecr.io/shoppingapi:v1
+  docker tag shoppingclient:latest dtsshoppingacr.azurecr.io/shoppingclient:v1
+
+Push images to registry
+  docker push dtsshoppingacr.azurecr.io/shoppingapi:v1
+  docker push dtsshoppingacr.azurecr.io/shoppingclient:v1
+
+List images in registry
+  az acr repository list --name dtsshoppingacr --output table
+    Result
+    --------------
+    shoppingapi
+    shoppingclient
+
+See tags
+  az acr repository show-tags --name dtsshoppingacr --repository shoppingclient --output table
+    Result
+    --------
+    v1
+
+Create AKS cluster with attaching ACR
+  az aks create --resource-group myResourceGroup --name myAKSCluster --node-count 1 --generate-ssh-keys --attach-acr dtsshoppingacr
+
+Install the Kubernetes CLI
+  az aks install-cli
+
+Connect to cluster using kubectl
+  az aks get-credentials --resource-group myResourceGroup --name myAKSCluster
+
+  To verify;
+    kubectl get nodes
+    kubectl get all
+
+Check Kube Config
+  kubectl config get-contexts
+  kubectl config current-context
+  kubectl config use-context <context-to-use>
+
+To create the pull secrete for ACR container
+  kubectl create secret docker-registry acr-secret --docker-server=dtsshoppingacr.azurecr.io --docker-username=dtsshoppingacr --docker-password=jovO3UnPkfoBh+13oLRRqm/LoA4C+jsjNIfZGtnWvm+ACRC0hT8o --docker-email=assis_marcos@hotmail.com
+  docker-username, docker-password can be found in the Azure Portal
+  docker-email is the azure subscription email
+
+To run/apply the changes in the aks folders
+ Check the current context: kubectl config current-context
+ The result must be: myAKSCluster
+ Apply the changes: kubectl apply -f .\aks\
+
+To check the services
+ kubectl get svc
+ kubectl get services
+   NAME                     TYPE           CLUSTER-IP     EXTERNAL-IP      PORT(S)        AGE
+   kubernetes               ClusterIP      10.0.0.1       <none>           443/TCP        21h
+   mongo-service            ClusterIP      10.0.219.114   <none>           27017/TCP      18h
+   shoppingapi-service      ClusterIP      10.0.44.71     <none>           80/TCP         18h
+   shoppingclient-service   LoadBalancer   10.0.174.195   20.226.192.236   80:32655/TCP   18h
+
+To scale pods manually
+  Get the deployments: kubectl get all
+
+   NAME                                        READY   UP-TO-DATE   AVAILABLE   AGE
+   deployment.apps/mongo-deployment            1/1     1            1           42m
+   deployment.apps/shoppingapi-deployment      1/1     1            1           42m
+   deployment.apps/shoppingclient-deployment   2/3     3            2           42m  <<---- the deployment we need to scale
+
+  Execute the follwoing command informing number of instances and the deployment name
+   kubectl scale --replicas=3 deployment.apps/shoppingclient-deployment
+  
+Autoscale pods in AKS
+ Get the AKS version. The version must be greater than 1.1
+ az aks show --resource-group myResourceGroup --name myAKSCluster --query kubernetesVersion --output table
+   Result
+   --------
+   1.27.7
+
+ Create the autoscaling yaml file
+ Apply the changes: kubectl apply -f .\aks\
+ Check the autoscaling resources
+   kubectl get hpa
+   NAME                 REFERENCE                              TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
+   shoppingapi-hpa      Deployment/shoppingapi-deployment      0%/50%    3         10        3          119s
+   shoppingclient-hpa   Deployment/shoppingclient-deployment   0%/50%    3         10        3          119s
+ Check the pods
+   kubectl get pod
+   NAME                                         READY   STATUS    RESTARTS   AGE
+   mongo-deployment-84b4c699c8-fm49k            1/1     Running   0          18h
+   shoppingapi-deployment-855c6c7cc6-6tbjw      0/1     Pending   0          49s >> should not be Pending
+   shoppingapi-deployment-855c6c7cc6-dgn7s      1/1     Running   0          49s
+   shoppingapi-deployment-855c6c7cc6-pc7fn      1/1     Running   0          18h
+   shoppingclient-deployment-645b76bc69-75sf4   1/1     Running   0          17h
+   shoppingclient-deployment-645b76bc69-p79dz   0/1     Pending   0          49s >> should not be Pending 
+   shoppingclient-deployment-645b76bc69-wmk97   0/1     Pending   0          49s >> should not be Pending
+
+   If a pod has a status Pending, it means there are errors
+   Check the pod: kubectl describe pod shoppingclient-deployment-645b76bc69-wmk97
+     Events:
+     Type     Reason            Age    From               Message
+     ----     ------            ----   ----               -------
+     Warning  FailedScheduling  4m35s  default-scheduler  0/1 nodes are available: 1 Insufficient cpu. preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod..
+
+    For this case we need to decrease the values of minReplicas for shoppingapi-hpa and apply the changes
+ 

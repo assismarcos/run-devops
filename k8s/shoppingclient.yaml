@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shoppingclient-deployment
+  labels:
+    app: shoppingclient
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shoppingclient
+  template:
+    metadata:
+      labels:
+        app: shoppingclient
+    spec:
+      containers:
+        - name: shoppingclient
+          image: assismarcos/shoppingclient:latest #image pulled from docker hub
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Development
+            - name: ShoppingAPIUrl #configuration required by the shopping client to connect to shopping api
+              valueFrom:
+                  configMapKeyRef: #reference to shoppingapi-configmap.yaml
+                    name: shoppingapi-configmap
+                    key: shoppingapi-url
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "250m"
+            limits:
+              memory: "128Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shoppingclient-service
+spec:
+  type: NodePort
+  selector:
+    app: shoppingclient
+  ports:
+    - protocol: TCP
+      port: 8001
+      targetPort: 80
+      nodePort: 30000 #port number to invoke the application from external systems, like the browser
+
+# to check the port numbers, use: kubectl get svc
+#NAME                     TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE
+#kubernetes               ClusterIP   10.96.0.1        <none>        443/TCP          18h
+#mongo-service            ClusterIP   10.107.80.201    <none>        27017/TCP        175m
+#shoppingapi-service      NodePort    10.99.180.115    <none>        8000:31000/TCP   34m
+#shoppingclient-service   NodePort    10.101.120.218   <none>        8001:30000/TCP   13m      

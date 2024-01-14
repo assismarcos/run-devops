@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shoppingapi-deployment
+  labels:
+    app: shoppingapi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shoppingapi
+  template:
+    metadata:
+      labels:
+        app: shoppingapi
+    spec:
+      containers:
+        - name: shoppingapi
+          image: dtsshoppingacr.azurecr.io/shoppingapi:v1 #image pulled from the Azure Container Registry
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Development
+            - name: DatabaseSettings__ConnectionString #variable required by the shopping api to connect to mongodb. appsettings.json -> DatabaseSettings:ConnectionString
+              valueFrom:
+                configMapKeyRef: # reference to mongo-configmap.yaml
+                  name: mongo-configmap
+                  key: connection-string
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "0.1"
+            limits:
+              memory: "128Mi"
+              cpu: "0.3"
+      imagePullSecrets:
+        - name: acr-secret #secret created by the command kubectl create secret docker-registry acr-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shoppingapi-service
+spec:
+  selector:
+    app: shoppingapi
+  ports:
+    - protocol: TCP
+      port: 80
