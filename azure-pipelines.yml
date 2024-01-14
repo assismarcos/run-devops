@@ -13,7 +13,7 @@ variables:
   dockerRegistryServiceConnection: '2cc61717-fb66-485e-b2f0-efe52431627b'
   imageRepository: 'assismarcosrundevops'
   containerRegistry: 'dtsshoppingacr.azurecr.io'
-  dockerfilePath: '$(Build.SourcesDirectory)/Shopping.API/Dockerfile'
+  dockerfilePath: '$(Build.SourcesDirectory)/Shopping.API/Dockerfile'  
   tag: '$(Build.BuildId)'
 
   # Agent VM image name
@@ -35,6 +35,6 @@ stages:
         repository: $(imageRepository)
         dockerfile: $(dockerfilePath)
         containerRegistry: $(dockerRegistryServiceConnection)
-        buildContext: $(Build.SourcesDirectory)/Shopping.API
+        buildContext: $(Build.SourcesDirectory)
         tags: |
           $(tag)
