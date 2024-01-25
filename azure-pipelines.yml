@@ -72,10 +72,6 @@ stages:
               action: deploy
               manifests: |
                 $(Pipeline.Workspace)/manifests/shoppingapi.yml
-
-#                $(Pipeline.Workspace)/manifests/deployment.yml # old
-#                $(Pipeline.Workspace)/manifests/service.yml    # removed
-
               imagePullSecrets: |
                 $(imagePullSecret)
               containers: |
